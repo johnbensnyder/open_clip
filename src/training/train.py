@@ -52,19 +52,20 @@ def backward(total_loss, scaler):
         total_loss.backward()
 
 
-def train_one_epoch(model, data, epoch, optimizer, scaler, scheduler, args, tb_writer=None):
+def train_one_epoch(model, data, epoch, optimizer, scaler, scheduler, args, loss=None, tb_writer=None):
     device = torch.device(args.device)
     autocast = get_autocast(args.precision)
     cast_dtype = get_cast_dtype(args.precision)
 
     model.train()
-    loss = ClipLoss(
-        local_loss=args.local_loss,
-        gather_with_grad=args.gather_with_grad,
-        cache_labels=True,
-        rank=args.rank,
-        world_size=args.world_size,
-        use_horovod=args.horovod)
+    if loss is None:
+        loss = ClipLoss(
+            local_loss=args.local_loss,
+            gather_with_grad=args.gather_with_grad,
+            cache_labels=True,
+            rank=args.rank,
+            world_size=args.world_size,
+            use_horovod=args.horovod)
 
     data['train'].set_epoch(epoch)  # set epoch in process safe manner via sampler or shared_epoch
     dataloader = data['train'].dataloader
@@ -160,7 +161,7 @@ def train_one_epoch(model, data, epoch, optimizer, scaler, scheduler, args, tb_w
         batch_time_m.update(time.time() - end)
         end = time.time()
         batch_count = i_accum + 1
-        if is_master(args) and (i_accum % args.log_every_n_steps or batch_count == num_batches_per_epoch):
+        if is_master(args) and (i_accum % args.log_every_n_steps==0 or batch_count == num_batches_per_epoch):
             batch_size = len(images)
             num_samples = batch_count * batch_size * args.world_size
             samples_per_epoch = dataloader.num_samples
