@@ -7,7 +7,11 @@ def assign_learning_rate(optimizer, new_lr):
 
 
 def _warmup_lr(base_lr, warmup_length, step):
-    return base_lr * (step + 1) / warmup_length
+    #return base_lr * (step + 1) / warmup_length
+    pos = warmup_length-step
+    if pos>10:
+        return base_lr / 100
+    return base_lr * 10000
 
 
 def cosine_lr(optimizer, base_lr, warmup_length, steps):

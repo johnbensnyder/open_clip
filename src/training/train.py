@@ -51,8 +51,21 @@ def backward(total_loss, scaler):
     else:
         total_loss.backward()
 
+def reduce_optimizer_state(model, optimizer):
+    '''
+    For now hardcode abs_min abs_max mean
+    '''
+    state_summary = {}
+    for param_name, param in model.named_parameters():
+        state_summary[f'{param_name}.optimizer.exp_avg.mean'] = optimizer.state[param]['exp_avg'].mean()
+        state_summary[f'{param_name}.optimizer.exp_avg.abs_min'] = optimizer.state[param]['exp_avg'].abs().min()
+        state_summary[f'{param_name}.optimizer.exp_avg.abs_max'] = optimizer.state[param]['exp_avg'].abs().max()
+        state_summary[f'{param_name}.optimizer.exp_avg_sq.mean'] = optimizer.state[param]['exp_avg_sq'].mean()
+        state_summary[f'{param_name}.optimizer.exp_avg_sq.abs_min'] = optimizer.state[param]['exp_avg_sq'].abs().min()
+        state_summary[f'{param_name}.optimizer.exp_avg_sq.abs_max'] = optimizer.state[param]['exp_avg_sq'].abs().max()
+    return state_summary
 
-def train_one_epoch(model, data, epoch, optimizer, scaler, scheduler, args, loss=None, tb_writer=None):
+def train_one_epoch(model, data, epoch, optimizer, scaler, scheduler, args, loss=None, tb_writer=None, debugger_hook=None):
     device = torch.device(args.device)
     autocast = get_autocast(args.precision)
     cast_dtype = get_cast_dtype(args.precision)
@@ -166,6 +179,12 @@ def train_one_epoch(model, data, epoch, optimizer, scaler, scheduler, args, loss
             num_samples = batch_count * batch_size * args.world_size
             samples_per_epoch = dataloader.num_samples
             percent_complete = 100.0 * batch_count / num_batches_per_epoch
+            
+            # Collect optimizer state for debugger
+            if debugger_hook:
+                state_summary = reduce_optimizer_state(model, optimizer)
+                for key, value in state_summary.items():
+                    debugger_hook.save_scalar(key, value)
 
             # NOTE loss is coarsely sampled, just master node and per log update
             loss_m.update(total_loss.item(), batch_size)

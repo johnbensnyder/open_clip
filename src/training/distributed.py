@@ -1,6 +1,6 @@
 import os
 
-import torch
+import torch    
 
 try:
     import horovod.torch as hvd
@@ -62,6 +62,8 @@ def world_info_from_env():
 def init_distributed_device(args):
     # Distributed training = training on more than one GPU.
     # Works in both single and multi-node scenarios.
+    if args.dist_backend=='smddp':
+        import smdistributed.dataparallel.torch.torch_smddp
     args.distributed = False
     args.world_size = 1
     args.rank = 0  # global rank
